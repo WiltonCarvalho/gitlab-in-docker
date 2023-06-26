@@ -1,0 +1,13 @@
+[[runners]]
+  [runners.cache]
+    Type = "s3"
+    Shared = true
+    [runners.cache.s3]
+      AccessKey = "root"
+      SecretKey = "kai0Eihipie3Iek7"
+      BucketName = "runner"
+      Insecure = true
+      ServerAddress = "minio:9000"
+  [runners.docker]
+    disable_cache = true
+    privileged = true

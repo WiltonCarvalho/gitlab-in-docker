@@ -1,0 +1,24 @@
+openssl genrsa -out example_ca.key 2048
+
+openssl req -x509 -new -nodes -key example_ca.key -days 36500 \
+  -out example_ca.pem -sha256 -subj '/O=Example/CN=example ca'
+
+openssl genrsa -out default.key 2048
+
+openssl req -new -key default.key -out default.csr -subj '/O=Example/CN=*.example.com'
+
+echo "extendedKeyUsage = clientAuth, serverAuth" > /tmp/san.txt
+echo "subjectAltName=IP:127.0.0.1,IP:172.31.0.10,DNS:example.com,DNS:*.example.com" >> /tmp/san.txt
+
+openssl x509 -CAcreateserial -days 36500 \
+  -req -in default.csr \
+  -CA example_ca.pem \
+  -CAkey example_ca.key \
+  -out default.crt \
+  -sha256 -extfile /tmp/san.txt
+
+openssl x509 -text -in default.crt
+
+cat example_ca.pem >> default.crt
+
+openssl verify -CAfile default.crt default.crt

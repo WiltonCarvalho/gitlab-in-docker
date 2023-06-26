@@ -1,0 +1,17 @@
+clone_repo:
+  image: bitnami/git
+  stage: build
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - git config --global http.sslVerify false
+    - git config --global user.name $GITLAB_USER_NAME
+    - git config --global user.email $GITLAB_USER_EMAIL
+    - |
+      set -ex
+      git clone https://gitlab.com/tigerwnz/minimal-gitops-app.git
+      cd minimal-gitops-app
+      git remote rename origin old-origin
+      git remote add origin http://gitlab.example.com/root/minimal-gitops-app.git
+      git push -o ci.skip --all http://anything:${root_token}@gitlab.example.com/root/minimal-gitops-app.git
+      git push -o ci.skip --tags http://anything:${root_token}@gitlab.example.com/root/minimal-gitops-app.git

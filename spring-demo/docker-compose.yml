@@ -1,0 +1,40 @@
+secrets:
+  aws:
+    file: $HOME/.aws/credentials
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      secrets:
+        - aws
+      args:
+        AWS_PROFILE: ${AWS_PROFILE:-default}
+    environment:
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      AWS_SHARED_CREDENTIALS_FILE: /.aws/credentials
+      AWS_CREDENTIAL_PROFILES_FILE: /.aws/credentials
+      AWS_REGION: sa-east-1
+      server_port: 8080
+      management_server_port: 8081
+      management_endpoints_web_exposure_include: info,health,prometheus
+      management_endpoint_health_showDetails: always
+    secrets:
+      - source: aws
+        target: /.aws/credentials
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    restart: "no"
+    healthcheck:
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      test: curl -fsSL http://127.0.0.1:8081/actuator/health
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 512M

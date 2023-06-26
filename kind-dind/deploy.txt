@@ -1,0 +1,17 @@
+docker-compose exec -it bastion zsh
+
+kubectl create deployment httpd --image=httpd --port=80
+kubectl expose deployment httpd --type=NodePort --port=80 --name=httpd
+
+kubectl create ingress httpd --class=nginx --default-backend httpd:80
+curl http://172.29.0.11
+
+kubectl delete ingress httpd
+kubectl create ingress httpd --class=nginx --rule httpd.example.com/=httpd:80
+curl -H "host:httpd.example.com" http://172.29.0.11
+
+kubectl logs deployments/httpd
+
+kubectl delete svc httpd
+kubectl delete ingress httpd
+kubectl delete deployment httpd

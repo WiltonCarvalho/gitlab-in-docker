@@ -1,0 +1,82 @@
+########### TODO ###########
+git clone https://gitlab.com/tigerwnz/minimal-gitops-app.git
+cd minimal-gitops-app
+git remote rename origin old-origin
+#git remote add origin git@gitlab.example.com:2222:project-1/minimal-gitops-app.git
+git remote add origin http://gitlab.example.com/project-1/minimal-gitops-app.git
+git config --global http.sslVerify false
+git push -u origin --all
+git push -u origin --tags
+
+
+git config --global http.sslVerify false
+root_token=glpat-3xM6cYkKHxiVtgqyme5x
+git clone http://anything:${root_token}@gitlab.example.com/root/minimal-gitops-app.git
+cd minimal-gitops-app
+git config user.name "Deploy Example Bot"
+git config user.email "test@example.com"
+
+git checkout -b release-0.7.0
+git add .
+git commit -m 0.7.0
+git tag -a 0.7.0 -m "Version 0.7.0"
+git push --tags -o merge_request.create -o merge_request.target=main origin release-0.7.0
+
+kai0Eihipie3Iek7@1
+
+
+echo "kai0Eihipie3Iek7" | docker login http://registry.example.com -u root --password-stdin
+
+echo "kai0Eihipie3Iek7" | skopeo login --tls-verify=false http://registry.example.com -u root --password-stdin
+
+kubectl create secret docker-registry registry-credentials --namespace=staging --docker-server=gitlab.example.com --docker-username=deploy --docker-password=glpat-BFqXAxKsvVoc1EFtbguh
+
+kubectl create secret docker-registry registry-credentials --namespace=production --docker-server=gitlab.example.com --docker-username=deploy --docker-password=glpat-BFqXAxKsvVoc1EFtbguh
+
+docker pull httpd
+docker tag httpd registry.example.com/project-1/minimal-gitops-app:httpd
+docker push registry.example.com/project-1/minimal-gitops-app:httpd
+docker logout http://registry.example.com
+
+echo "glpat-xtb2Pdcwvsx3VzSN-sEb" | docker login http://registry.example.com -u deploy --password-stdin
+docker pull registry.example.com/project-1/minimal-gitops-app:httpd
+
+
+
+kubectl -n mynamespace create deployment httpd --image=registry.example.com/project-1/minimal-gitops-app:httpd --port=80 \
+  --dry-run=client -o yaml > httpd.yaml
+
+kubectl apply -f httpd.yaml
+
+kubectl get deployment my-deployment -n default -o json | jq '.spec.template.spec.initContainers[] += {"securityContext":{"runAsUser":999}}' | kubectl apply -f -
+
+kubectl create deployment minimal-gitops-app --namespace="test" --image="test:image" --dry-run=client --output=json | jq '.spec.template.spec.imagePullSecrets += [{"name":"registry-credentials"}]' | kubectl create -f - --dry-run=client -o yaml
+
+openssl s_client -showcerts -connect registry.example.com:443 < /dev/null | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > /tmp/ca.crt
+mkdir -p /etc/docker/certs.d/registry.example.com
+mv /tmp/ca.crt /etc/docker/certs.d/registry.example.com/ca.crt
+
+
+cat <<EOF> secret.yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: registry-credentials
+  namespace: review-v3-88yd39
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: $(cat ~/.docker/config.json | base64 -w0)
+EOF
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: review-v3-88yd39
+imagePullSecrets:
+- name: registry-credentials
+EOF
+
+
+kubectl patch serviceaccount default -p '{"imagePullSecrets": [{"name": "registry-credentials"}]}' -n 

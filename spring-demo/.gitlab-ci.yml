@@ -1,0 +1,22 @@
+default:
+  image:
+    name: docker:24-cli
+    entrypoint: ["/bin/ash", "-c"]
+
+stages:
+  - build
+  #- deploy
+
+build:
+  stage: build
+  image: docker:20-git
+  before_script:
+    - docker version
+    - docker info
+  script:
+    - env
+    - echo "$CI_REGISTRY_PASSWORD" | docker login http://$CI_REGISTRY -u "$CI_REGISTRY_USER" --password-stdin
+    - IMAGE_TAG="${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}"
+    - docker pull httpd
+    - docker tag httpd "$CI_REGISTRY_IMAGE:$IMAGE_TAG"
+    - docker push "$CI_REGISTRY_IMAGE:$IMAGE_TAG"

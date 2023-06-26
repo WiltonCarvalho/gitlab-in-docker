@@ -1,0 +1,192 @@
+default:
+  image:
+    name: docker:24-git
+    entrypoint: ["/bin/ash", "-c"]
+
+workflow:
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+stages:
+  - build
+  - test
+  - review
+  - release
+  - staging
+  - production
+
+.rules_app_changes:
+  rules:
+    - changes:
+        - .gitlab/**/*
+        - src/**/*
+        - test/**/*
+        - .gitlab-ci.yml
+        - Dockerfile
+        - Gemfile*
+
+.deploy:
+  script:
+    - |
+      git config --global http.sslVerify false
+      git config user.name "Deploy Example Bot"
+      git config user.email "test@example.com"
+      git fetch origin $DEPLOYMENT_BRANCH
+      git checkout $DEPLOYMENT_BRANCH
+      git merge $CI_COMMIT_SHA --ff-only
+      git push http://anything:$DEPLOYMENT_TOKEN@$CI_SERVER_HOST/$CI_PROJECT_PATH.git HEAD:$DEPLOYMENT_BRANCH
+  resource_group: $CI_ENVIRONMENT_SLUG
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TAG
+      changes:
+        - deploy/manifests/**/*
+    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+      when: never
+
+staging:
+  stage: staging
+  extends: .deploy
+  environment: staging
+  variables:
+    DEPLOYMENT_BRANCH: _gitlab/agents/staging
+
+production:
+  stage: production
+  extends: .deploy
+  environment: production
+  when: manual
+  variables:
+    DEPLOYMENT_BRANCH: _gitlab/agents/production
+
+build:
+  stage: build
+  # image: docker:24-git
+  # services:
+  #   - name: docker:24-dind
+  #     command:
+  #       - --insecure-registry=http://registry.example.com
+  script:
+    - env
+    - echo "$CI_REGISTRY_PASSWORD" | docker login http://$CI_REGISTRY -u "$CI_REGISTRY_USER" --password-stdin
+    - IMAGE_TAG="${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}"
+    - docker build -t "$CI_REGISTRY_IMAGE:$IMAGE_TAG" .
+    - docker push "$CI_REGISTRY_IMAGE:$IMAGE_TAG"
+    - echo "IMAGE_URL=$CI_REGISTRY_IMAGE:$IMAGE_TAG" > build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+  rules:
+    - !reference [.rules_app_changes, rules]
+
+test:
+  stage: test
+  image: ruby:3-alpine
+  needs:
+    - job: build
+      artifacts: true
+  script:
+    - echo $IMAGE_URL
+    # - bundle install
+    # - bundle exec ruby test/*
+  rules:
+    - !reference [.rules_app_changes, rules]
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  # variables:
+  #   GIT_STRATEGY: none
+  script:
+    - |
+      for ENVIRONMENT in staging production; do
+        if [ ! $(grep $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG deploy/manifests/$ENVIRONMENT/deployment.yaml) ]; then
+          echo "Wrong TAG in manifests"
+          exit 1
+        fi
+      done
+    - |
+      release-cli --insecure-https --server-url $CI_SERVER_URL --private-token $DEPLOYMENT_TOKEN create \
+      --name $CI_COMMIT_TAG \
+      --description release-branch-$CI_COMMIT_REF_NAME-$CI_JOB_ID \
+      --tag-name $CI_COMMIT_TAG \
+      --ref $CI_COMMIT_SHORT_SHA
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TAG
+      changes:
+        - deploy/manifests/**/*
+    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+      when: never
+  artifacts:
+    paths:
+    - deploy/manifests
+
+review:
+  stage: review
+  script:
+    - |
+      set -ex
+      apk add --no-cache --update jq yq
+      wget https://storage.googleapis.com/kubernetes-release/release/v1.27.1/bin/linux/amd64/kubectl
+      chmod +x ./kubectl
+      mv ./kubectl /usr/local/bin
+      git config --global http.sslVerify false
+      git config user.name "Deploy Example Bot"
+      git config user.email "test@example.com"
+      git fetch origin $DEPLOYMENT_BRANCH
+      git checkout $DEPLOYMENT_BRANCH
+      mkdir -p $MANIFEST_DIR
+      kubectl create namespace "$CI_ENVIRONMENT_SLUG" \
+        --dry-run=client --output=yaml > $MANIFEST_DIR/namespace.yaml
+      kubectl create service nodeport minimal-gitops-app --namespace="$CI_ENVIRONMENT_SLUG" \
+        --tcp=8080:8080 --dry-run=client --output=yaml > $MANIFEST_DIR/service.yaml
+      kubectl create ingress minimal-gitops-app-ingress --namespace="$CI_ENVIRONMENT_SLUG" \
+        --rule="/*=minimal-gitops-app:8080" --dry-run=client --output=yaml > $MANIFEST_DIR/ingress.yaml
+      kubectl create secret docker-registry registry-credentials --namespace="$CI_ENVIRONMENT_SLUG" \
+        --docker-server=http://$CI_REGISTRY --docker-username=deploy --docker-password=$REGISTRY_READ_TOKEN \
+        --dry-run=client -o yaml > $MANIFEST_DIR/registry-credentials.yaml
+      kubectl create deployment minimal-gitops-app-deployment --namespace="$CI_ENVIRONMENT_SLUG" \
+        --image="$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" --dry-run=client --output=json \
+        | jq '.spec.template.spec.imagePullSecrets += [{"name":"registry-credentials"}]' \
+        | yq -p json > $MANIFEST_DIR/deployment.yaml
+      git add $MANIFEST_DIR
+      git commit -m "Create review app $CI_COMMIT_REF_NAME"
+      git push http://anything:$DEPLOYMENT_TOKEN@$CI_SERVER_HOST/$CI_PROJECT_PATH.git HEAD:$DEPLOYMENT_BRANCH
+  resource_group: review
+  environment:
+    name: review/$CI_COMMIT_REF_NAME
+    on_stop: stop_review
+  variables:
+    DEPLOYMENT_BRANCH: _gitlab/agents/review
+    MANIFEST_DIR: deploy/manifests/review/$CI_ENVIRONMENT_SLUG
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: never
+    - !reference [.rules_app_changes, rules]
+
+stop_review:
+  stage: review
+  variables:
+    #GIT_STRATEGY: none
+    DEPLOYMENT_BRANCH: _gitlab/agents/review
+    MANIFEST_DIR: deploy/manifests/review/$CI_ENVIRONMENT_SLUG
+  script:
+    - |
+      set -ex
+      git config http.sslVerify false
+      git config user.name "Deploy Example Bot"
+      git config user.email "test@example.com"
+      git fetch origin $DEPLOYMENT_BRANCH
+      git checkout $DEPLOYMENT_BRANCH
+      git rm -r $MANIFEST_DIR
+      git commit -m "Delete review app $CI_COMMIT_REF_NAME"
+      git push http://anything:$DEPLOYMENT_TOKEN@$CI_SERVER_HOST/$CI_PROJECT_PATH.git HEAD:$DEPLOYMENT_BRANCH
+  when: manual
+  resource_group: review
+  environment:
+    name: review/$CI_COMMIT_REF_NAME
+    action: stop
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: never
+    - !reference [.rules_app_changes, rules]

@@ -1,0 +1,81 @@
+networks:
+  proxy:
+    name: proxy
+    external: true
+
+services:
+  gitlab:
+    container_name: gitlab
+    build:
+      dockerfile: Dockerfile
+      context: .
+    networks:
+      - proxy
+    ports:
+      - "2222:22"
+    deploy:
+      resources:
+        limits:
+          memory: 5120M
+        reservations:
+          memory: 5120M
+    healthcheck:
+      start_period: 4m
+      test: 'curl -fsSL -H "Gitlab-Bypass-Rate-Limiting: 1" -H "host: gitlab.example.com" http://127.0.0.1/-/health'
+    volumes:
+      - gitlab_data:/var/opt/gitlab
+      - gitlab_logs:/var/log/gitlab
+      - gitlab_config:/etc/gitlab
+    shm_size: 256m
+    environment:
+      VIRTUAL_HOST: gitlab.example.com,registry.example.com
+      CERT_NAME: default
+      GITLAB_OMNIBUS_CONFIG: |
+        gitlab_rails['initial_root_password'] = 'kai0Eihipie3Iek7'
+        external_url 'http://gitlab.example.com'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        letsencrypt['enable'] = false
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        nginx['redirect_http_to_https'] = false
+        mattermost_nginx['redirect_http_to_https'] = false
+        # gitlab_rails['gitlab_default_projects_features_container_registry'] = false
+        registry_external_url 'http://registry.example.com'
+        registry_nginx['listen_port'] = 80
+        registry_nginx['listen_https'] = false
+        registry_nginx['redirect_http_to_https'] = false
+        # https://docs.gitlab.com/omnibus/settings/memory_constrained_envs.html
+        puma['worker_processes'] = 0
+        sidekiq['max_concurrency'] = 10
+        prometheus_monitoring['enable'] = false
+        gitlab_rails['env'] = {
+          'MALLOC_CONF' => 'dirty_decay_ms:1000,muzzy_decay_ms:1000',
+          'GITLAB_THROTTLE_BYPASS_HEADER' => 'Gitlab-Bypass-Rate-Limiting'
+        }
+        # gitaly['cgroups_repositories_count'] = 2
+        # gitaly['cgroups_mountpoint'] = '/sys/fs/cgroup'
+        # gitaly['cgroups_hierarchy_root'] = 'gitaly'
+        # gitaly['cgroups_memory_bytes'] = 500000
+        # gitaly['cgroups_cpu_shares'] = 512
+        gitaly['concurrency'] = [
+          {
+            'rpc' => "/gitaly.SmartHTTPService/PostReceivePack",
+            'max_per_repo' => 3
+          }, {
+            'rpc' => "/gitaly.SSHService/SSHUploadPack",
+            'max_per_repo' => 3
+          }
+        ]
+        gitaly['env'] = {
+          'MALLOC_CONF' => 'dirty_decay_ms:1000,muzzy_decay_ms:1000',
+          'GITALY_COMMAND_SPAWN_MAX_PARALLEL' => '2'
+        }
+      TZ: America/Sao_Paulo
+
+volumes:
+  gitlab_data:
+    name: gitlab_data
+  gitlab_config:
+    name: gitlab_config
+  gitlab_logs:
+    name: gitlab_logs

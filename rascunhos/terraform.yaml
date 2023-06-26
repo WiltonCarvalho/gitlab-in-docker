@@ -1,0 +1,108 @@
+workflow:
+    rules:
+      - if: $CI_COMMIT_BRANCH != "main" && $CI_PIPELINE_SOURCE != "merge_request_event"
+        when: never
+      - when: always
+
+variables:
+  TF_DIR: ${CI_PROJECT_DIR}/terraform
+  STATE_NAME: "clodquicklabs-tf"
+  ADDRESS: "https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/${STATE_NAME}"
+
+stages:
+  - validate
+  - plan
+  - apply
+  - destroy
+
+image:
+  name: hashicorp/terraform:light
+  entrypoint: [""]
+
+before_script:
+  - terraform --version
+  - export GITLAB_ACCESS_TOKEN=$TOKEN
+  - cd ${TF_DIR}
+  - |
+    terraform init -reconfigure \
+      -backend-config="address=${ADDRESS}" \
+      -backend-config="lock_address=${ADDRESS}/lock" \
+      -backend-config="unlock_address=${ADDRESS}/lock" \
+      -backend-config="username=<UseName>" \
+      -backend-config="password=$GITLAB_ACCESS_TOKEN" \
+      -backend-config="lock_method=POST" \
+      -backend-config="unlock_method=DELETE" \
+      -backend-config="retry_wait_min=5"
+
+validate:
+  stage: validate
+  script:
+    - terraform validate
+    - terraform fmt -check=true
+  cache:
+    key: ${CI_COMMIT_REF_NAME}
+    paths:
+    - ${TF_DIR}/.terraform
+    policy: pull-push
+  # only:
+  #   - branches
+
+plan:
+  stage: plan
+  script:
+    - terraform plan 
+  dependencies:
+    - validate
+  cache:
+    key: ${CI_COMMIT_REF_NAME}
+    paths:
+    - ${TF_DIR}/.terraform
+    policy: pull
+
+# merge review:
+#   stage: plan
+#   script:
+#     - terraform plan -out=$PLAN
+#     - echo \`\`\`diff > plan.txt
+#     - terraform show -no-color ${PLAN} | tee -a plan.txt
+#     - echo \`\`\` >> plan.txt
+#     - sed -i -e 's/  +/+/g' plan.txt
+#     - sed -i -e 's/  ~/~/g' plan.txt
+#     - sed -i -e 's/  -/-/g' plan.txt
+#     - MESSAGE=$(cat plan.txt)
+#     - >-
+#       curl -X POST -g -H "PRIVATE-TOKEN: ${GITLAB_TOKEN}"
+#       --data-urlencode "body=${MESSAGE}"
+#       "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/discussions"
+#   artifacts:
+#     name: plan
+#     paths:
+#       - $PLAN
+#   only:
+#     - merge_requests
+
+apply:
+  stage: apply
+  script:
+    - terraform apply -auto-approve
+  dependencies:
+    - plan
+  cache:
+    key: ${CI_COMMIT_REF_NAME}
+    paths:
+    - ${TF_DIR}/.terraform
+    policy: pull
+
+destroy:
+  stage: destroy
+  script:
+    - terraform destroy -auto-approve
+  dependencies:
+    - plan
+    - apply
+  cache:
+    key: ${CI_COMMIT_REF_NAME}
+    paths:
+    - ${TF_DIR}/.terraform
+    policy: pull
+  when: manual

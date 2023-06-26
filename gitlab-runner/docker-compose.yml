@@ -1,0 +1,172 @@
+networks:
+  runner:
+    name: runner
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+          gateway: 172.30.0.1
+
+services:
+  dind:
+    image: docker:24-dind
+    container_name: dind
+    hostname: dind
+    privileged: true
+    networks:
+      runner:
+        ipv4_address: 172.30.0.11
+    extra_hosts:
+      - "gitlab.example.com:172.30.0.1"
+      - "registry.example.com:172.30.0.1"
+    environment:
+      - DOCKER_TLS_CERTDIR=/certs
+    command:
+      - --storage-driver=overlay2
+      - --insecure-registry=http://registry.example.com
+    volumes:
+      - dind_data:/var/lib/docker
+      - /certs
+
+  runner-1:
+    image: gitlab/gitlab-runner:alpine
+    container_name: runner-1
+    hostname: runner-1
+    networks:
+      - runner
+    extra_hosts:
+      - "gitlab.example.com:172.30.0.1"
+      - "registry.example.com:172.30.0.1"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -ex
+        # exec sleep infinity
+        while ! curl -fsSL -k http://gitlab.example.com/-/readiness?token=$$READINESS_TOKEN; do sleep 1; done
+        gitlab-runner unregister --all-runners
+        gitlab-runner register --non-interactive --locked=false --name=runner-1 \
+          --executor=docker \
+          --docker-image=docker:24-cli \
+          --docker-network-mode=bridge \
+          --docker-volumes="/certs:/certs" \
+          --env="DOCKER_HOST=tcp://dind:2376" \
+          --env="DOCKER_CERT_PATH=/certs/client" \
+          --env="DOCKER_TLS_VERIFY=1" \
+          --template-config=/runner-template.toml \
+          --run-untagged="true" \
+          --access-level="not_protected" \
+          --docker-extra-hosts="gitlab.example.com:172.30.0.1" \
+          --docker-extra-hosts="registry.example.com:172.30.0.1" \
+          --docker-extra-hosts="dind:172.30.0.11"
+        exec gitlab-runner run --user=gitlab-runner --working-directory=/home/gitlab-runner
+    volumes:
+      - $PWD/runner-template.toml:/runner-template.toml
+      - gitlab_runner_config_1:/etc/gitlab-runner
+    environment:
+      - DOCKER_HOST=tcp://dind:2376
+      - DOCKER_CERT_PATH=/certs/client
+      - DOCKER_TLS_VERIFY=1
+      - update=2
+    env_file:
+      - .env
+    volumes_from:
+      - dind
+
+  runner-2:
+    image: gitlab/gitlab-runner:alpine
+    container_name: runner-2
+    hostname: runner-2
+    networks:
+      - runner
+    extra_hosts:
+      - "gitlab.example.com:172.30.0.1"
+      - "registry.example.com:172.30.0.1"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -ex
+        # exec sleep infinity
+        while ! curl -fsSL -k http://gitlab.example.com/-/readiness?token=$$READINESS_TOKEN; do sleep 1; done
+        gitlab-runner unregister --all-runners
+        gitlab-runner register --non-interactive --locked=false --name=runner-2 \
+          --executor=docker \
+          --docker-image=docker:24-cli \
+          --docker-network-mode=bridge \
+          --docker-volumes="/certs:/certs" \
+          --env="DOCKER_HOST=tcp://dind:2376" \
+          --env="DOCKER_CERT_PATH=/certs/client" \
+          --env="DOCKER_TLS_VERIFY=1" \
+          --template-config=/runner-template.toml \
+          --run-untagged="true" \
+          --access-level="not_protected" \
+          --docker-extra-hosts="gitlab.example.com:172.30.0.1" \
+          --docker-extra-hosts="registry.example.com:172.30.0.1" \
+          --docker-extra-hosts="dind:172.30.0.11"
+        exec gitlab-runner run --user=gitlab-runner --working-directory=/home/gitlab-runner
+    volumes:
+      - $PWD/runner-template.toml:/runner-template.toml
+      - gitlab_runner_config_2:/etc/gitlab-runner
+    environment:
+      - DOCKER_HOST=tcp://dind:2376
+      - DOCKER_CERT_PATH=/certs/client
+      - DOCKER_TLS_VERIFY=1
+      - update=2
+    env_file:
+      - .env
+    volumes_from:
+      - dind
+
+  minio:
+    container_name: minio
+    image: minio/minio
+    networks:
+      - runner
+    ports:
+      - 9089:9089
+    entrypoint: ""
+    command:
+      - sh
+      - -c
+      - |
+        exec minio server --quiet /data --console-address :9089
+    environment:
+      - TZ=America/Sao_Paulo
+      - MINIO_ROOT_USER=root
+      - MINIO_ROOT_PASSWORD=kai0Eihipie3Iek7
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      interval: 5s
+      test: curl -fsSL http://127.0.0.1:9000/minio/health/ready
+
+  s3-bucket:
+    container_name: s3-bucket
+    image: minio/mc
+    networks:
+      - runner
+    environment:
+      - TZ=America/Sao_Paulo
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        /usr/bin/mc config host add minio http://minio:9000 root kai0Eihipie3Iek7
+        /usr/bin/mc mb -p minio/runner
+        exit 0
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+
+volumes:
+  dind_data:
+    name: dind_data
+  minio_data:
+    name: minio_data
+  gitlab_runner_config_1:
+    name: gitlab_runner_config_1
+  gitlab_runner_config_2:
+    name: gitlab_runner_config_2
