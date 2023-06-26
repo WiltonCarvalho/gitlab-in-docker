@@ -8,7 +8,7 @@ cd gitlab-server
 docker-compose up -d
 docker-compose logs gitlab -f --tail 10
 
-cd kind-dind
+cd kind-in-dind
 docker-compose up -d
 docker-compose logs bastion -f
 docker-compose exec -it bastion zsh
@@ -24,15 +24,13 @@ docker-compose up -d
 #################################
 ########### <Stop> ###########
 docker-compose --project-directory gitlab-runner down
-docker-compose --project-directory kind-dind down
+docker-compose --project-directory kind-in-dind down
 docker-compose --project-directory gitlab-server down
 docker-compose --project-directory nginx-proxy down
 
 docker volume rm \
   gitlab_config gitlab_data gitlab_logs \
   gitlab_runner_config_1 gitlab_runner_config_2 \
-  minio_data dind_data kind_dind_data
+  minio_data dind_data kind_in_dind_data
 ########### </Stop> ###########
 
-
-#################################
