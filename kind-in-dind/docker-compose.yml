@@ -1,0 +1,66 @@
+networks:
+  kind-in-dind:
+    name: kind-in-dind
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
+          gateway: 172.29.0.1
+
+services:
+  kind-in-dind:
+    image: docker:24-dind
+    container_name: kind-in-dind
+    hostname: kind-in-dind
+    privileged: true
+    ports:
+      - 6443:6443
+    networks:
+      kind-in-dind:
+        ipv4_address: 172.29.0.11
+    extra_hosts:
+      - "gitlab.example.com:172.29.0.1"
+      - "registry.example.com:172.29.0.1"
+    environment:
+      - DOCKER_TLS_CERTDIR=/certs
+    command:
+      - --storage-driver=overlay2
+      - --insecure-registry=http://registry.example.com
+    volumes:
+      - kind_in_dind_data:/var/lib/docker
+      - /certs
+
+  bastion:
+    image: bastion
+    build: .
+    container_name: bastion
+    hostname: bastion
+    networks:
+      - kind-in-dind
+    extra_hosts:
+      - "gitlab.example.com:172.29.0.1"
+      - "registry.example.com:172.29.0.1"
+    environment:
+      - DOCKER_HOST=tcp://kind-in-dind:2376
+      - DOCKER_CERT_PATH=/certs/client
+      - DOCKER_TLS_VERIFY=1
+    volumes_from:
+      - kind-in-dind
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -ex
+        while ! docker ps 2>/dev/null; do sleep 1; done
+        docker start kind-control-plane 2>/dev/null || kind create cluster --image kindest/node:v1.26.2 --config ~/kind-config.yaml
+        mkdir -p ~/.kube
+        kind get kubeconfig > ~/.kube/config || true
+        sed "s/0.0.0.0/172.29.0.1/g" -i ~/.kube/config || true
+        chmod 600 ~/.kube/config
+        kubectl cluster-info || true
+        kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml || true
+        exec sleep infinity
+
+volumes:
+  kind_in_dind_data:
+    name: kind_in_dind_data
