@@ -2,6 +2,8 @@ networks:
   runner:
     name: runner
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: runner
     ipam:
       config:
         - subnet: 172.30.0.0/16

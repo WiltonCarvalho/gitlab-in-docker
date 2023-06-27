@@ -2,6 +2,8 @@ networks:
   proxy:
     name: proxy
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: proxy
     ipam:
       config:
         - subnet: 172.31.0.0/16

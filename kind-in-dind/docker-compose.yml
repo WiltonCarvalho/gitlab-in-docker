@@ -2,6 +2,8 @@ networks:
   kind-in-dind:
     name: kind-in-dind
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: kind-in-dind
     ipam:
       config:
         - subnet: 172.29.0.0/16
