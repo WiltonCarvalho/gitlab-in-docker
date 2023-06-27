@@ -21,6 +21,13 @@ docker-compose logs gitlab -f --tail 10
 ```
 xdg-open http://gitlab.example.com
 ```
+# Gitlab Runners with dind and minio(s3 cache)
+```
+cd gitlab-runner
+# Set the Runner and Readiness Tokens
+vi .env
+docker-compose up -d
+```
 # Docker-based Local Kubernetes
 ```
 cd kind-in-dind
@@ -30,18 +37,25 @@ docker-compose logs bastion -f
 # Bastion Host
 ```
 docker-compose exec -it bastion zsh
+```
+```
 kubectl get nodes
-kubectl pod -A
+
+kubectl create deployment httpd --image=httpd --port=80
+kubectl expose deployment httpd --type=NodePort --port=80 --name=httpd
+kubectl create ingress httpd --class=nginx --rule httpd.example.com/=httpd:80
+
+kubectl get pods
+kubectl get svc
+
+curl -H "host:httpd.example.com" http://172.29.0.11
+
+kubectl logs deployments/httpd
+
 k9s
 ```
-# Gitlab Runners with dind and minio(s3 cache)
-```
-cd gitlab-runner
-# Set the Runner and Readiness Tokens
-vi .env
-docker-compose up -d
-```
-# Stop all
+
+# Stop All
 ```
 docker-compose --project-directory gitlab-runner down
 docker-compose --project-directory kind-in-dind down
