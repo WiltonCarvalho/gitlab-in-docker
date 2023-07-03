@@ -1,22 +1,124 @@
 default:
   image:
-    name: docker:24-cli
+    name: docker:24-git
     entrypoint: ["/bin/ash", "-c"]
 
 stages:
   - build
-  #- deploy
+  - deploy
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "development"
+    - if: $CI_COMMIT_BRANCH == "staging" && $CI_MERGE_REQUEST_IID
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_MERGE_REQUEST_IID
 
 build:
   stage: build
-  image: docker:20-git
+  rules:
+    - changes:
+        - src/**/*
+        - .gitlab-ci.yml
+        - Dockerfile
+        - build.gradle
+        - settings.gradle
   before_script:
     - docker version
     - docker info
   script:
     - env
+    - docker context create tls-environment
     - echo "$CI_REGISTRY_PASSWORD" | docker login http://$CI_REGISTRY -u "$CI_REGISTRY_USER" --password-stdin
     - IMAGE_TAG="${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}"
-    - docker pull httpd
-    - docker tag httpd "$CI_REGISTRY_IMAGE:$IMAGE_TAG"
-    - docker push "$CI_REGISTRY_IMAGE:$IMAGE_TAG"
+    - |
+      docker buildx create --name image-builder --use tls-environment --driver docker-container --driver-opt network=host
+    - |
+      docker buildx build --platform=linux/amd64,linux/arm64/v8 --tag "$CI_REGISTRY_IMAGE:$IMAGE_TAG" \
+        --output=type=registry,registry.insecure=true --push --progress=plain . --sbom=false --provenance=false
+    - |
+      apk add jq skopeo
+    - |
+      skopeo inspect --tls-verify=false docker://$CI_REGISTRY_IMAGE:$IMAGE_TAG --raw | jq .
+    - |
+      skopeo copy docker://$CI_REGISTRY_IMAGE:$IMAGE_TAG \
+        docker://$CI_REGISTRY_IMAGE:$IMAGE_TAG-amd64 \
+        --src-tls-verify=false \
+        --dest-tls-verify=false \
+        --override-arch=amd64
+    - |
+      skopeo copy docker://$CI_REGISTRY_IMAGE:$IMAGE_TAG \
+        docker://$CI_REGISTRY_IMAGE:$IMAGE_TAG-arm64 \
+        --src-tls-verify=false \
+        --dest-tls-verify=false \
+        --override-arch=arm64
+
+.deploy:
+  script:
+  before_script:
+    - |
+      wget -O- https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv4.5.7/kustomize_v4.5.7_linux_amd64.tar.gz | \
+        tar zxvf - -C "/usr/local/bin"
+    - git config --global http.sslVerify false
+    - git config --global user.email "gitlab-ci@example.com"
+    - git config --global user.name "Deploy Bot"
+    - git remote set-url origin http://anything:$DEPLOYMENT_TOKEN@$CI_SERVER_HOST/$CI_PROJECT_PATH.git
+    - |
+      echo "Pull to Deployment Branch"
+      git checkout $DEPLOYMENT_BRANCH
+      git pull
+  script:
+    - |
+      echo "Kustomize Manifests"
+      IMAGE_TAG="${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}"
+      sh -c "sed \"s|value:.*|value: $CI_REGISTRY_IMAGE:$IMAGE_TAG|g\" -i $MANIFEST_DIR/container-ImageRegistryUri.yaml"
+    - |
+      kustomize build $MANIFEST_DIR
+      git add $MANIFEST_DIR
+    - |
+      git commit -m "Create deploy from $CI_COMMIT_REF_NAME"
+    - |
+      echo "Release TAG"
+      VERSION=$(grep ^version build.gradle | grep -Eo "[0-9]+\.[0-9]+\.[0-9]*")
+      git tag release-$VERSION
+      git remote set-url origin http://anything:$DEPLOYMENT_TOKEN@$CI_SERVER_HOST/$CI_PROJECT_PATH.git
+      git push --tags -o ci.skip origin release-$VERSION
+    # git push --tags -o merge_request.create -o merge_request.target=staging origin release-$VERSION
+    # git push http://anything:$DEPLOYMENT_TOKEN@$CI_SERVER_HOST/$CI_PROJECT_PATH.git HEAD:$DEPLOYMENT_BRANCH
+
+deploy-dev:
+  stage: deploy
+  extends: .deploy
+  resource_group: development
+  environment:
+    name: development
+  variables:
+    DEPLOYMENT_BRANCH: argocd/development
+    MANIFEST_DIR: infra/dev
+  only:
+    - development
+
+deploy-hml:
+  stage: deploy
+  extends: .deploy
+  resource_group: staging
+  environment:
+    name: staging
+  variables:
+    DEPLOYMENT_BRANCH: argocd/staging
+    MANIFEST_DIR: infra/hml
+  only:
+    - staging
+  when: manual
+
+deploy-prod:
+  stage: deploy
+  extends: .deploy
+  resource_group: production
+  environment:
+    name: production
+  variables:
+    DEPLOYMENT_BRANCH: argocd/production
+    MANIFEST_DIR: infra/prod
+  only:
+    - main
+  when: manual

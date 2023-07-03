@@ -22,10 +22,11 @@ services:
       - "gitlab.example.com:172.30.0.1"
       - "registry.example.com:172.30.0.1"
     environment:
+      - TZ=America/Sao_Paulo
       - DOCKER_TLS_CERTDIR=/certs
     command:
       - --storage-driver=overlay2
-      - --insecure-registry=http://registry.example.com
+      - --insecure-registry=registry.example.com
     volumes:
       - dind_data:/var/lib/docker
       - /certs
@@ -66,6 +67,7 @@ services:
       - $PWD/runner-template.toml:/runner-template.toml
       - gitlab_runner_config_1:/etc/gitlab-runner
     environment:
+      - TZ=America/Sao_Paulo
       - DOCKER_HOST=tcp://dind:2376
       - DOCKER_CERT_PATH=/certs/client
       - DOCKER_TLS_VERIFY=1
@@ -111,6 +113,7 @@ services:
       - $PWD/runner-template.toml:/runner-template.toml
       - gitlab_runner_config_2:/etc/gitlab-runner
     environment:
+      - TZ=America/Sao_Paulo
       - DOCKER_HOST=tcp://dind:2376
       - DOCKER_CERT_PATH=/certs/client
       - DOCKER_TLS_VERIFY=1

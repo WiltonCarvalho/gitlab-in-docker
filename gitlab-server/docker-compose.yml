@@ -28,9 +28,11 @@ services:
       - gitlab_config:/etc/gitlab
     shm_size: 256m
     environment:
+      TZ: America/Sao_Paulo
       VIRTUAL_HOST: gitlab.example.com,registry.example.com
       CERT_NAME: default
       GITLAB_OMNIBUS_CONFIG: |
+        gitlab_rails['time_zone'] = 'America/Sao_Paulo'
         gitlab_rails['initial_root_password'] = 'kai0Eihipie3Iek7'
         external_url 'http://gitlab.example.com'
         gitlab_rails['gitlab_shell_ssh_port'] = 2222
@@ -70,7 +72,6 @@ services:
           'MALLOC_CONF' => 'dirty_decay_ms:1000,muzzy_decay_ms:1000',
           'GITALY_COMMAND_SPAWN_MAX_PARALLEL' => '2'
         }
-      TZ: America/Sao_Paulo
 
 volumes:
   gitlab_data:

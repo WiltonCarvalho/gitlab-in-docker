@@ -4,8 +4,7 @@ echo "172.31.0.1 gitlab.example.com registry.example.com" | sudo tee -a /etc/hos
 ```
 # Docker Nginx Reverse Proxy
 ```
-cd nginx-proxy
-docker-compose up -d
+( cd nginx-proxy; docker-compose up -d; )
 ```
 ```
 curl -H "Host: whoami.example.com" http://172.31.0.10 -k
@@ -14,29 +13,30 @@ curl -H "Host: test.example.com" https://172.31.0.10 -k
 
 # Gitlab Server
 ```
-cd gitlab-server
-docker-compose up -d
-docker-compose logs gitlab -f --tail 10
+( cd gitlab-server; docker-compose up -d; )
+
+docker logs gitlab -f --tail 10
 ```
 ```
 xdg-open http://gitlab.example.com
+root:kai0Eihipie3Iek7
 ```
 # Gitlab Runners with dind and minio(s3 cache)
 ```
-cd gitlab-runner
 # Set the Runner and Readiness Tokens
-vi .env
-docker-compose up -d
+vi gitlab-runner/.env
+
+( cd gitlab-runner; docker-compose up -d; )
 ```
 # Docker-based Local Kubernetes
 ```
-cd kind-in-dind
-docker-compose up -d
-docker-compose logs bastion -f
+( cd kind-in-dind; docker-compose up -d; )
+
+docker logs bastion -f
 ```
 # Bastion Host
 ```
-docker-compose exec -it bastion zsh
+docker exec -it bastion zsh
 ```
 ```
 kubectl get nodes

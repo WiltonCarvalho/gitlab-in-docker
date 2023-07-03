@@ -1,0 +1,41 @@
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.7.6/manifests/install.yaml
+
+cat <<EOF> argocd-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd
+  namespace: argocd
+  annotations: 
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: argocd.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 443
+EOF
+
+kubectl apply -f argocd-ingress.yaml
+
+curl -H "host:argocd.example.com" https://172.29.0.11/healthz -k
+echo "172.29.0.11 argocd.example.com" | sudo tee -a /etc/hosts
+
+xdg-open http://argocd.example.com
+admin
+kubectl -n argocd get secrets argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+
+
+k -n dev create secret docker-registry --docker-username spring-demo --docker-password 'glpat-dmCbWy9uSQ3KR6svVQyz' --docker-server registry.example.com spring-demo-registry
+
+curl -H "host:dev-ws-spring-demo.example.com" https://172.29.0.11

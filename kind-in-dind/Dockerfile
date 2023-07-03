@@ -9,11 +9,14 @@ RUN set -ex \
       && chmod +x /usr/local/bin/kubectl /usr/local/bin/kind \
       && wget -O- https://get.helm.sh/helm-v3.8.1-linux-amd64.tar.gz | \
             tar zxvf - -C "/usr/local/bin" linux-amd64/helm --strip-components 1 \
+      && export KUSTOMIZE_VERSION=v4.5.7 \
+      && wget -O- https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz | \
+            tar zxvf - -C "/usr/local/bin" \
       && apk add --no-cache --update \
             zsh vim curl git jq yq k9s skopeo \
             alpine-zsh-config zsh-theme-powerlevel10k \
             zsh-syntax-highlighting zsh-autosuggestions \
-            sudo \
+            sudo glab \
       && adduser -D sudo -s /bin/zsh \
       && echo '%sudo ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-sudo-nopasswd \
       && sed '/root:x:0:0:root/ s/ash/zsh/g' -i /etc/passwd

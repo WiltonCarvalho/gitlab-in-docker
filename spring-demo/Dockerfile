@@ -1,4 +1,4 @@
-FROM amazoncorretto:11 AS builder
+FROM --platform=amd64 amazoncorretto:11 AS builder
 
 ARG AWS_PROFILE=${AWS_PROFILE:-default}
 ARG AWS_CREDENTIAL_PROFILES_FILE=/.aws/credentials
