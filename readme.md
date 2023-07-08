@@ -36,6 +36,15 @@ vi gitlab-runner/.env
 
 docker logs runner-1 -f --tail 10
 ```
+# Gitlab Root Token
+```
+docker exec -it gitlab bash
+
+gitlab-rails runner '
+  token = User.find_by_username("root").personal_access_tokens.create(scopes: ["api"], name: "root_token", expires_at: 365.days.from_now);
+  token.set_token("kai0Eihipie3Iek7");
+  token.save!'
+```
 # Gitlab Projects Setup
 - Create users
   - dev1, dev2, hml1, infra1
@@ -65,6 +74,7 @@ docker logs runner-1 -f --tail 10
   - useranme: gitlab+deploy-token-1
 # Create project applications/spring-demo
 ```
+cd demo-projects/applications/spring-demo
 git init --initial-branch=main
 git remote add origin http://anything:kai0Eihipie3Iek7@gitlab.example.com/applications/spring-demo.git
 git add .
@@ -79,6 +89,7 @@ git push --set-upstream origin HEAD:develop
   - "v*" - Developer can Push/Merge
 # Create project gitops-manifests/spring-demo
 ```
+cd demo-projects/gitops-manifests/spring-demo
 git init --initial-branch=main
 git remote add origin http://anything:kai0Eihipie3Iek7@gitlab.example.com/gitops-manifests/spring-demo.git
 git add .
