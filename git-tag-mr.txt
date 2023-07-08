@@ -1,0 +1,12 @@
+git add .
+VERSION=$(grep ^version build.gradle | grep -Eo "[0-9]+\.[0-9]+\.[0-9]*")
+git commit -m "version $VERSION"
+git tag -a v$VERSION -m "version $VERSION"
+git push --tags origin v$VERSION
+
+
+git checkout -b test
+touch test.txt
+git add .
+git commit -m test
+git push --set-upstream origin test -o merge_request.create -o merge_request.target=main
