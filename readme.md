@@ -21,13 +21,58 @@ docker logs gitlab -f --tail 10
 xdg-open http://gitlab.example.com
 root:kai0Eihipie3Iek7
 ```
+# Gitlab Runner Setup
+- Access the Gitlab
+  - http://gitlab.example.com
+  - root:kai0Eihipie3Iek7
+- Get the readiness token and the registration token to configure the runners
+
 # Gitlab Runners with dind and minio(s3 cache)
 ```
 # Set the Runner and Readiness Tokens
 vi gitlab-runner/.env
 
 ( cd gitlab-runner; docker-compose up -d; )
+
+docker logs runner-1 -f --tail 10
 ```
+# Gitlab Projects Setup
+- Create users
+  - dev1, dev2, hml1, infra1
+- Create user groups
+  - users-dev
+    - dev1(Maintainer)
+    - dev2(Developer)
+  - users-hml
+    - hml1(Developer)
+  - users-infra
+    - infra1(Maintainer)
+- Create project groups
+  - applications
+  - gitops-manifests
+- Add group users-dev to group applications as Developer
+- Add group users-dev to group gitops-manifests as Developer
+- Add group users-hml to group gitops-manifests as Developer
+- Add group users-infra to group gitops-manifests as Maintainer
+- Create gitops-manifests group token(DEPLOYMENT_TOKEN)
+  - API rights
+  - Developer Role
+- Create applications group protected variable DEPLOYMENT_TOKEN
+  - Add the gitops-manifests group token
+- Create project applications/spring-demo
+  - Branches
+    - main(protected)
+    - develop(protected) - Developer can Push
+- Create project gitops-manifests/spring-demo
+  - Branches
+    - main(protected) - Only Maintainer can Push/Accept Merge Requests
+    - dev
+    - hml
+- Any member of the applications group should be able the merge/push to
+  - gitops-manifests/spring-demo(dev, hml)
+- Any member of the applications group need to have merge requests accepted by users-infra
+  - gitops-manifests/spring-demo(main)
+
 # Docker-based Local Kubernetes
 ```
 ( cd kind-in-dind; docker-compose up -d; )

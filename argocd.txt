@@ -36,6 +36,10 @@ admin
 kubectl -n argocd get secrets argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
 
 
-k -n dev create secret docker-registry --docker-username spring-demo --docker-password 'glpat-dmCbWy9uSQ3KR6svVQyz' --docker-server registry.example.com spring-demo-registry
+kubectl -n dev create secret docker-registry \
+  --docker-username spring-demo \
+  --docker-password 'glpat-dmCbWy9uSQ3KR6svVQyz' \
+  --docker-server registry.example.com \
+  spring-demo-registry
 
 curl -H "host:dev-ws-spring-demo.example.com" https://172.29.0.11

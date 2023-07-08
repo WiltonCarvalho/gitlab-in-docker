@@ -9,5 +9,6 @@
       Insecure = true
       ServerAddress = "minio:9000"
   [runners.docker]
+    helper_image = "gitlab/gitlab-runner-helper:x86_64-85586bd1"
     disable_cache = true
     privileged = true

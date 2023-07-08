@@ -1,0 +1,46 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+namePrefix: hml
+nameSuffix: vue-demo
+vars:
+  - name: APP_NAME
+    objref:
+      name: "-"
+      kind: Service
+      apiVersion: v1
+    fieldref:
+      fieldpath: metadata.name
+commonLabels:
+  app: "$(APP_NAME)"
+patches:
+  - path: container-ImagePullSecrets.yaml
+    target:
+      kind: Deployment
+      name: "-"
+  - path: container-ImageRegistryUri.yaml
+    target:
+      kind: Deployment
+      name: "-"
+  - path: container-Name.yaml
+    target:
+      kind: Deployment
+      name: "-"
+  - path: container-ResourcesLimits.yaml
+    target:
+      kind: Deployment
+      name: "-"
+  - path: ingress-ClassName.yaml
+    target:
+      kind: Ingress
+      name: "-"
+  - path: ingress-ContextPath.yaml
+    target:
+      kind: Ingress
+      name: "-"
+  - path: ingress-DnsHost.yaml
+    target:
+      kind: Ingress
+      name: "-"
+  - path: replica-and-rollout-strategy.yaml

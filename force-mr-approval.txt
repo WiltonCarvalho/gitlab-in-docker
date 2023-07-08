@@ -1,0 +1,19 @@
+# Merge Config: Pipelines must succeed
+stages:
+  - approval
+approval:
+  stage: approval
+  variables:
+    GIT_STRATEGY: none
+  image:
+    name: alpine
+    entrypoint: ["/bin/ash", "-c"]
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+  script:
+    - env
+    - apk add --no-cache --update jq curl
+    - >
+      curl -fsSL -H "PRIVATE-TOKEN: $DEPLOYMENT_TOKEN"
+      "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/approvals" 
+      | jq -e '.approved_by[0]'
