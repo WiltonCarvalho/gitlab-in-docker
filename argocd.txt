@@ -36,10 +36,12 @@ admin
 kubectl -n argocd get secrets argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
 
 
-kubectl -n dev create secret docker-registry \
-  --docker-username spring-demo \
-  --docker-password 'glpat-dmCbWy9uSQ3KR6svVQyz' \
+kubectl -n default create secret docker-registry \
+  --docker-username 'gitlab+deploy-token-1' \
+  --docker-password 'uanw5unH_g3n93w2rQD2' \
   --docker-server registry.example.com \
-  spring-demo-registry
+  gitlab-registry
+
+kubectl patch serviceaccount default -p '{"imagePullSecrets": [{"name": "gitlab-registry"}]}'
 
 curl -H "host:dev-ws-spring-demo.example.com" https://172.29.0.11

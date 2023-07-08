@@ -3,7 +3,7 @@ VERSION=$(grep ^version build.gradle | grep -Eo "[0-9]+\.[0-9]+\.[0-9]*")
 git commit -m "version $VERSION"
 git tag -a v$VERSION -m "version $VERSION"
 git push --tags origin v$VERSION
-
+git tag -d v$VERSION
 
 git checkout -b test
 touch test.txt

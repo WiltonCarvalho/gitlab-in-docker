@@ -54,24 +54,55 @@ docker logs runner-1 -f --tail 10
 - Add group users-dev to group gitops-manifests as Developer
 - Add group users-hml to group gitops-manifests as Developer
 - Add group users-infra to group gitops-manifests as Maintainer
-- Create gitops-manifests group token(DEPLOYMENT_TOKEN)
-  - API rights
+- Create gitops-manifests Settings/Group Access Token(DEPLOYMENT_TOKEN)
+  - write_repository
   - Developer Role
-- Create applications group protected variable DEPLOYMENT_TOKEN
-  - Add the gitops-manifests group token
-- Create project applications/spring-demo
-  - Branches
-    - main(protected)
-    - develop(protected) - Developer can Push
-- Create project gitops-manifests/spring-demo
-  - Branches
-    - main(protected) - Only Maintainer can Push/Accept Merge Requests
-    - dev
-    - hml
+  - Copy the token Value
+- Create applications group Settings/CICD/Protected Variable DEPLOYMENT_TOKEN
+  - Use the gitops-manifests Group Access Token
+- Create applications group Settings/Repository/Deploy Token REGISTRY_READ_ONLY
+  - read_registry
+  - useranme: gitlab+deploy-token-1
+# Create project applications/spring-demo
+```
+git init --initial-branch=main
+git remote add origin http://anything:kai0Eihipie3Iek7@gitlab.example.com/applications/spring-demo.git
+git add .
+git commit -m "Initial commit"
+git push --set-upstream origin main
+git push --set-upstream origin HEAD:develop
+```
+- Progetected Branches
+  - main(protected) - Maintainer can Push/Merge
+  - develop(protected) - Developer can Push/Merge
+- Progetected Tags
+  - "v*" - Developer can Push/Merge
+# Create project gitops-manifests/spring-demo
+```
+git init --initial-branch=main
+git remote add origin http://anything:kai0Eihipie3Iek7@gitlab.example.com/gitops-manifests/spring-demo.git
+git add .
+git commit -m "Initial commit"
+git push --set-upstream origin HEAD:main
+git push --set-upstream origin HEAD:hml
+git push --set-upstream origin HEAD:dev
+```
+- Branches
+  - main(protected) - Only Maintainer can Push/Accept Merge Requests
+  - dev
+  - hml
 - Any member of the applications group should be able the merge/push to
   - gitops-manifests/spring-demo(dev, hml)
-- Any member of the applications group need to have merge requests accepted by users-infra
+- Any member of the applications group need to have Merge Requests accepted by users-infra
   - gitops-manifests/spring-demo(main)
+# Commit a TAG to applications/spring-demo
+```
+git add .
+VERSION=$(grep ^version build.gradle | grep -Eo "[0-9]+\.[0-9]+\.[0-9]*")
+git commit -m "version $VERSION"
+git tag -a v$VERSION -m "version $VERSION"
+git push --tags origin v$VERSION
+```
 
 # Docker-based Local Kubernetes
 ```

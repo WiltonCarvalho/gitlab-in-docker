@@ -1,0 +1,28 @@
+docker exec -it gitlab bash
+
+gitlab-rails runner '
+  token = User.find_by_username("root").personal_access_tokens.create(scopes: ["api"], name: "root_token", expires_at: 365.days.from_now);
+  token.set_token("kai0Eihipie3Iek7");
+  token.save!'
+
+
+git init --initial-branch=main
+git remote add origin http://anything:kai0Eihipie3Iek7@gitlab.example.com/applications/spring-demo.git
+git add .
+git commit -m "Initial commit"
+git push --set-upstream origin main
+git push --set-upstream origin HEAD:develop
+
+git init --initial-branch=main
+git remote add origin http://anything:kai0Eihipie3Iek7@gitlab.example.com/gitops-manifests/spring-demo.git
+git add .
+git commit -m "Initial commit"
+git push --set-upstream origin HEAD:main
+git push --set-upstream origin HEAD:hml
+git push --set-upstream origin HEAD:dev
+
+gitlab-rails runner 'PersonalAccessToken.find_by_token("kai0Eihipie3Iek7").revoke!'
+
+gitlab-rails runner '
+  token = PersonalAccessToken.find_by_token("kai0Eihipie3Iek7");
+  token.update!(revoked:false)'
