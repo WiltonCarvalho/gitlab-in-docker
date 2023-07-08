@@ -82,10 +82,10 @@ git commit -m "Initial commit"
 git push --set-upstream origin main
 git push --set-upstream origin HEAD:develop
 ```
-- Progetected Branches
+- Protected Branches
   - main(protected) - Maintainer can Push/Merge
   - develop(protected) - Developer can Push/Merge
-- Progetected Tags
+- Protected Tags
   - "v*" - Developer can Push/Merge
 # Create project gitops-manifests/spring-demo
 ```
