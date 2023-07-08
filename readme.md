@@ -1,4 +1,4 @@
-# FQDN on /etc/host
+# FQDN on /etc/hosts
 ```
 echo "172.31.0.1 gitlab.example.com registry.example.com" | sudo tee -a /etc/hosts
 ```
