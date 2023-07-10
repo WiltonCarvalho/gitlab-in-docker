@@ -130,7 +130,7 @@ kubectl get nodes
 
 kubectl create deployment httpd --image=httpd --port=80
 kubectl expose deployment httpd --type=NodePort --port=80 --name=httpd
-kubectl create ingress httpd --class=nginx --rule httpd.example.com/=httpd:80
+kubectl create ingress httpd --class=nginx --rule httpd.example.com/*=httpd:80
 
 kubectl get pods
 kubectl get svc

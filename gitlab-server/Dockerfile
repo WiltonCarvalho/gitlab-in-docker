@@ -1,1 +1,0 @@
-FROM gitlab/gitlab-ce:16.1.2-ce.0
